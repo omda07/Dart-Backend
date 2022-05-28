@@ -9,6 +9,8 @@ dependencies:
   shelf: 
   shelf_router: 
   supabase: 
+  crypt:
+  dart_jsonwebtoken:
 
 dev_dependencies:
   build_runner:

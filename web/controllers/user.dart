@@ -1,5 +1,6 @@
 import 'dart:convert';
-
+import 'package:crypt/crypt.dart';
+import 'package:dart_jsonwebtoken/dart_jsonwebtoken.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
 import 'package:supabase/supabase.dart';
@@ -20,11 +21,18 @@ class Users {
       final payload = jsonDecode(await request.readAsString());
 
       // If the payload is passed properly
-      if (payload.containsKey('name') && payload.containsKey('age')) {
+      if (payload.containsKey('name') &&
+          payload.containsKey('email') &&
+          payload.containsKey('password')) {
+        // Default rounds
+        final c3 = Crypt.sha256(payload['password'], salt: 'abcdefghijklmnop');
+        print(c3);
         // Create operation
-        final res = await client
-            .from('user')
-            .insert({'name': payload['name'], 'age': payload['age']}).execute();
+        final res = await client.from('user').insert({
+          'name': payload['name'],
+          'email': payload['email'],
+          'password': c3.toString()
+        }).execute();
 
         // If Create operation fails
         if (res.error != null) {
@@ -40,6 +48,58 @@ class Users {
         print(res.data.toString());
         return Response.ok(
           jsonEncode({'success': true, 'data': res.data}),
+          headers: {'Content-type': 'application/json'},
+        );
+      }
+
+      // If data sent as payload is not as per the rules
+      return Response.notFound(
+          jsonEncode({
+            'success': false,
+            'data': 'Invalid data sent to API',
+          }),
+          headers: {'Content-type': 'application/json'});
+    });
+
+    ///  Login user
+
+    router.post('/users/login', (Request request) async {
+      final payload = jsonDecode(await request.readAsString());
+
+      // If the payload is passed properly
+      if (payload.containsKey('email') && payload.containsKey('password')) {
+        var res = await client
+            .from('user')
+            .select('id,name,email,password')
+            .match({'email': payload['email']}).execute();
+        print(res.data);
+        print(res.data[0]['password']);
+        // res.data is null if we pass a string as ID eg: 11a
+        final h = Crypt(res.data[0]['password']);
+
+        if (res.data == null || !h.match(payload['password'])) {
+          return Response.notFound(
+              jsonEncode(
+                  {'success': false, 'data': 'email or password invalid'}),
+              headers: {'Content-type': 'application/json'});
+        }
+        final jwt = JWT(
+          {
+            'id': res.data[0]['id'],
+          },
+        );
+
+        // Sign it
+        String token = jwt.sign(SecretKey('secret passphrase'));
+
+        res = await client
+            .from('user')
+            .select('id,name,email')
+            .match({'email': payload['email']}).execute();
+        // Return the newly added data
+        print(res.data.toString());
+        return Response.ok(
+          jsonEncode({'success': true, 'data': res.data[0], 'token': token}),
           headers: {'Content-type': 'application/json'},
         );
       }
