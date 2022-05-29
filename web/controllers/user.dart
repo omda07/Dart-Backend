@@ -91,7 +91,6 @@ class Users {
 
         // Sign it
         String token = jwt.sign(SecretKey('secret passphrase'));
-
         res = await client
             .from('user')
             .select('id,name,email')
