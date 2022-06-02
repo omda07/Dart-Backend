@@ -16,7 +16,6 @@ class Users {
             Response.notFound('We dont have an API for this request'));
 
     /// Create new user
-
     router.post('/users/create', (Request request) async {
       final payload = jsonDecode(await request.readAsString());
 
